@@ -1,5 +1,5 @@
-from keras.models import Model
-from keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input
 
 from .layers import Repeat, TTA, Merge
 from .augmentation import Augmentation
@@ -17,11 +17,8 @@ doc = """
         v_flip: (bool) vertical flip
         h_shifts: (list of int) list of horizontal shifts (e.g. [10, -10])
         v_shifts: (list of int) list of vertical shifts (e.g. [10, -10])
-        rotation: (list of int) list of angles (deg) for rotation in range [0, 360),
+        rotation_angles: (list of int) list of angles (deg) for rotation in range [0, 360),
             should be divisible by 90 deg (e.g. [90, 180, 270])
-        contrast: (list of float) values for contrast adjustment
-        add: (list of int or float) values to add on image (e.g. [-10, 10])
-        mul: (list of float) values to multiply image on (e.g. [0.9, 1.1])
         merge: one of 'mean', 'gmean' and 'max' - mode of merging augmented
             predictions together.
 
@@ -30,44 +27,33 @@ doc = """
 
 """
 
-def segmentation(
-    model,
-    h_flip=False,
-    v_flip=False,  
-    h_shift=None,
-    v_shift=None,
-    rotation=None,
-    contrast=None,
-    add=None,
-    mul=None,
-    merge='mean',
-    input_shape=None,
-):
+def tta_segmentation(model,
+                     h_flip=False,
+                     v_flip=False,
+                     h_shift=None,
+                     v_shift=None,
+                     rotation=None,
+                     contrast=None,
+                     add=None,
+                     mul=None,
+                     merge='mean'):
+
     """
     Segmentation model test time augmentation wrapper.
     """
-    tta = Augmentation(
-        h_flip=h_flip,
-        v_flip=v_flip,
-        h_shift=h_shift,
-        v_shift=v_shift,
-        rotation=rotation,
-        contrast=contrast,
-        add=add,
-        mul=mul,
-    )
+    tta = Augmentation(h_flip=h_flip,
+                       v_flip=v_flip,
+                       h_shift=h_shift,
+                       v_shift=v_shift,
+                       rotation=rotation,
+                       contrast=contrast,
+                       add=add,
+                       mul=mul,
+                       )
 
-    if input_shape is None:
-        try:
-            input_shape = model.input_shape[1:]
-        except AttributeError:
-            raise AttributeError(
-                'Can not determine input shape automatically, please provide `input_shape` '
-                'argument to wrapper (e.g input_shape=(None, None, 3)).'
-            )
-    batch_shape = (1, *input_shape) # add batch dimension
+    input_shape = (1, *model.input.shape.as_list()[1:])
 
-    inp = Input(batch_shape=batch_shape)
+    inp = Input(batch_shape=input_shape)
     x = Repeat(tta.n_transforms)(inp)
     x = TTA(*tta.forward)(x)
     x = model(x)
@@ -78,45 +64,33 @@ def segmentation(
     return tta_model
 
 
-def classification(
-    model,
-    h_flip=False,
-    v_flip=False,
-    h_shift=None,
-    v_shift=None,
-    rotation=None,
-    contrast=None,
-    add=None,
-    mul=None,
-    merge='mean',
-    input_shape=None,
-):
+def tta_classification(model,
+                       h_flip=False,
+                       v_flip=False,
+                       h_shift=None,
+                       v_shift=None,
+                       rotation=None,
+                       contrast=None,
+                       add=None,
+                       mul=None,
+                       merge='mean'):
     """
     Classification model test time augmentation wrapper.
     """
 
-    tta = Augmentation(
-        h_flip=h_flip,
-        v_flip=v_flip,
-        h_shift=h_shift,
-        v_shift=v_shift,
-        rotation=rotation,
-        contrast=contrast,
-        add=add,
-        mul=mul,
-    )
-    
-    if input_shape is None:
-        try:
-            input_shape = model.input_shape[1:]
-        except AttributeError:
-            raise AttributeError(
-                'Can not determine input shape automatically, please provide `input_shape` '
-                'argument to wrapper (e.g input_shape=(None, None, 3)).'
-            )
-    batch_shape = (1, *input_shape) # add batch dimension
+    tta = Augmentation(h_flip=h_flip,
+                       v_flip=v_flip,
+                       h_shift=h_shift,
+                       v_shift=v_shift,
+                       rotation=rotation,
+                       contrast=contrast,
+                       add=add,
+                       mul=mul,
+                       )
 
-    inp = Input(batch_shape=batch_shape)
+    input_shape = (1, *model.input.shape.as_list()[1:])
+
+    inp = Input(batch_shape=input_shape)
     x = Repeat(tta.n_transforms)(inp)
     x = TTA(*tta.forward)(x)
     x = model(x)
@@ -126,9 +100,5 @@ def classification(
     return tta_model
 
 
-classification.__doc__ += doc
-segmentation.__doc__ += doc
-
-# legacy support
-tta_classification = classification
-tta_segmentation = segmentation
+tta_classification.__doc__ += doc
+tta_segmentation.__doc__ += doc
